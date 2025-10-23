@@ -8,6 +8,11 @@ class Livro(BaseModel):
     autor: str
     ano: int
 
+class Autor(BaseModel):
+    nome: str
+    idade: int
+
+
 dicionario_livros = {}
 
 @app.get("/")
@@ -16,37 +21,56 @@ def read_root():
 
 @app.get("/livros/")
 def listar_livros(pagina: int = 1, tamanho: int = 3):
-
-    if not dicionario_livros:
-        return {"message": "Nenhum livro cadastrado."}
-
     pagina_inicial = (pagina - 1) * tamanho
-    #pag 1          = (1 - 1) * 5 = 0
-    #pag 2          = (2 - 1) * 5 = 5
-    #pag 3          = (3 - 1) * 5 = 10 
-    #pag 4          = (4 - 1) * 5 = 15
-    #pag 5          = (5 - 1) * 5 = 20
-    #pag 6           = (6 - 1) * 5 = 25
+    pagina_final = pagina_inicial + tamanho
+  
+    #convertendo o dicionário de livros em uma lista de tuplas (id, livro)
+    lista_livro = list(dicionario_livros.items())
 
-    pagina_final = pagina_inicial + tamanho 
+    #cortando a nossa lista de livros para retornar apenas os livros da página solicitada
+    lista_livro_page = lista_livro[pagina_inicial:pagina_final]
 
-    livros_paginados = [
-        {
-            "id": livro_id,
+    livros_pag= []
+
+    for id, livro in lista_livro_page:
+        livro_dict = {
+            "id": id,
             "titulo": livro.titulo,
             "autor": livro.autor,
             "ano": livro.ano
-        } 
-        for livro_id, livro in list(dicionario_livros.items())[pagina_inicial:pagina_final]
-    ]
-    
+        }
+
+        livros_pag.append(livro_dict)
 
     return {
-        "pagina": pagina,
-        "tamanho de itens na pagina": tamanho,
-        "livros": len(dicionario_livros),
-        "livros": livros_paginados
-    }
+        "page=": pagina,
+        "size=": tamanho,
+        "livros": livros_pag
+        }
+
+def pega_ano(dicionario_livros):
+       return  dicionario_livros['ano']
+
+@app.get("/livros/ordenados-ano")
+def listar_livros_ordenados():
+    lista_livros = []
+    for id, livro in dicionario_livros.items():
+        
+        livro_dict = {
+            "id": id,
+            "titulo": livro.titulo,
+            "autor": livro.autor,
+            "ano": livro.ano
+        }
+
+        lista_livros.append(livro_dict)
+
+    lista_livros_ordenada = sorted(lista_livros, key=pega_ano)
+
+    return {"livros_ordenados_ano": lista_livros_ordenada}
+
+
+
 
 @app.post("/livros/{livro_id}")
 def adicionar_livro(livro_id: int, livro: Livro = Body(...)):
@@ -87,3 +111,13 @@ def deletar_livro(livro_id: int):
 
     del dicionario_livros[livro_id]
     return {"message": "Livro deletado com sucesso."}
+
+disc_autores = {}
+
+@app.get('/autores/')
+def listar_autores():
+    pass # implementação futura
+
+@app.post('/autores/{autor_id}')
+def adicionar_autor(autor_id: int, autor: Autor = Body(...)):
+    pass # implementação futura

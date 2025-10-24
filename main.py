@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, Depends, HTTPException   
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 
 app = FastAPI()
@@ -11,6 +12,10 @@ class Livro(BaseModel):
 class Autor(BaseModel):
     nome: str
     idade: int
+
+class Usuario(BaseModel):
+    nome: str
+    email: str
 
 
 dicionario_livros = {}
@@ -115,9 +120,114 @@ def deletar_livro(livro_id: int):
 disc_autores = {}
 
 @app.get('/autores/')
-def listar_autores():
-    pass # implementação futura
+def listar_autores(pag: int = 1, size: int = 2):
+    pagina_inicial = (pag - 1) * size
+    pagina_final = pagina_inicial + size
+
+    ordem_autores = sorted(disc_autores.items(), key = lambda x: x[1].nome)
+
+    autores_pag = []
+
+    for id, autor in ordem_autores[pagina_inicial:pagina_final]:
+        autor_dict = {
+            "id": id,
+            "nome": autor.nome,
+            "idade": autor.idade
+        }
+
+        autores_pag.append(autor_dict)
+
+    return {
+        "page=": pag,
+        "size=": size,
+        "autores": autores_pag
+        }
+    
 
 @app.post('/autores/{autor_id}')
 def adicionar_autor(autor_id: int, autor: Autor = Body(...)):
-    pass # implementação futura
+    if autor_id in disc_autores:
+        return {"message": "Autor com este ID já existe."}
+
+    disc_autores[autor_id] = autor
+    return {"message": "Autor adicionado com sucesso.", "autor": autor}
+
+
+@app.get('/autores/filtro/')
+def filtrar_autores(pag: int = 1, size: int = 2, filtar: str = "id"):
+
+    if pag < 1 : 
+        return { "erro": "Página deve ser mais 1"}
+
+
+    pagina_inicial = (pag - 1) * size
+    pagina_final = pagina_inicial + size
+
+
+    if filtar == "nome": 
+        ordem_autores = sorted(list(disc_autores.items()), key = lambda x: x[1].nome)
+
+    elif filtar == "idade":
+        ordem_autores = sorted(list(disc_autores.items()), key = lambda x: x[1].idade)
+
+    elif filtar == "id":
+        ordem_autores = sorted(list(disc_autores.items()), key = lambda x: x[0])
+    else:
+        return { "erro": "Filtro inválido. Use 'id', 'nome' ou 'idade'."}
+
+
+    autores_pag = []
+
+    for id, autor in ordem_autores[pagina_inicial:pagina_final]:
+        autor_dict = {
+            "id": id,
+            "nome": autor.nome,
+            "idade": autor.idade
+        }
+
+        autores_pag.append(autor_dict)
+
+    return {
+        "page=": pag,
+        "size=": size,
+        "autores": autores_pag,
+        "paginacao": {
+            "total_autores": len(disc_autores),
+        }
+
+    }
+
+
+
+def autentica(credentials : HTTPBasicCredentials = Depends(HTTPBasic())):
+   username = "admin"
+   password = "senha123"
+   if credentials.username != username or credentials.password != password:
+         raise HTTPException(status_code=401, detail="Credenciais inválidas.")
+   return credentials.username
+
+
+disc_usuarios = {}
+proximo_id_usuario = 1
+
+
+
+@app.get('/usuarios/')
+def listar_usuarios(username : str = Depends(autentica)):
+    return {"usuario":disc_usuarios}
+
+
+
+@app.post('/usuarios/')
+def adicionar_usuario(
+    usuario: Usuario = Body(...),
+    username : str = Depends(autentica)
+    ):
+
+
+    global proximo_id_usuario
+
+    disc_usuarios[proximo_id_usuario] = usuario
+    proximo_id_usuario += 1
+    return {"message": "Usuário adicionado com sucesso.", "usuario": usuario}
+  
